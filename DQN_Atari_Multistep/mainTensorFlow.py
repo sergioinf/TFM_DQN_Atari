@@ -23,7 +23,7 @@ def optimize_model(nSteps):
     y_objetivo = tensorflow.reduce_max(y_objetivo, 1)
     y_objetivo = tensorflow.multiply(y_objetivo, gammas)
     y_objetivo = y_objetivo + recompensas
-    y_objetivo = y_objetivo * (1-dones_tensor) - dones_tensor
+    #y_objetivo = y_objetivo * (1-dones_tensor) - dones_tensor
     
     mascara = tensorflow.one_hot(acciones, NUM_ACTIONS)
     
@@ -78,25 +78,27 @@ def juegaPartidas():
     print("Juego las partidas")
     puntuacionesTotales = []
     for i in range(20):
-        recompensaPorPartida = 0
-        for vidas in range(5):
-            estadoInicial = np.array(env.reset())
-            for i in count():
-                estado_tensor = tensorflow.convert_to_tensor(estadoInicial)
-                estado_tensor = tensorflow.expand_dims(estadoInicial, 0)
+        recompensaDQN = 0
 
-                salida = red_objetivo(estado_tensor, training=False)
-                accion = tensorflow.argmax(salida[0]).numpy()
+        estadoInicial = np.array(env.reset())
+        for i in count():
+            estado_tensor = tensorflow.convert_to_tensor(estadoInicial)
+            estado_tensor = tensorflow.expand_dims(estadoInicial, 0)
 
-                estado_sig, recompensa, done, _ = env.step(accion)
-                recompensaPorPartida+=recompensa
-                estado_sig = np.array(estado_sig)
+            salida = red_objetivo(estado_tensor, training=False)
+            accion = tensorflow.argmax(salida[0]).numpy()
 
-                estadoInicial = estado_sig
+            estado_sig, recompensa, done, _ = env.step(accion)
+            if recompensa == 1: recompensaDQN+= 1
 
-                if done:  
-                    break
-        puntuacionesTotales.append(recompensaPorPartida)
+            estado_sig = np.array(estado_sig)
+
+            estadoInicial = estado_sig
+
+            if done:  
+                break
+
+        puntuacionesTotales.append(recompensaDQN)
     mediaPuntuaciones = np.array(puntuacionesTotales).mean()
     desviacion = np.std(np.array(puntuacionesTotales))
     desviacionesTipicas.append(desviacion)
@@ -118,6 +120,7 @@ def entrena():
 
     while True:
         estadoInicial = np.array(env.reset())
+        marcaPunto = False
         for i in range(1, PASOS_MAX_EPISODIO):
             pasos+=1
             if pasos < 50000 or np.random.rand(1)[0] < epsilon:
@@ -135,7 +138,17 @@ def entrena():
             estado_sig, recompensa, done, _ = env.step(accion)
             estado_sig = np.array(estado_sig)
 
-            if i == PASOS_MAX_EPISODIO - 1 and not done:
+            if done and recompensa == 1:
+                done = False
+                marcaPunto = True
+            elif recompensa == 1:
+                marcaPunto = True
+                done = 3 
+            
+            if recompensa == -1:
+                done = True
+
+            if i == PASOS_MAX_EPISODIO - 1 and not done and not marcaPunto:
                 done = 3
 
             memoria.save(estadoInicial, accion, recompensa, estado_sig, float(done))
@@ -145,13 +158,13 @@ def entrena():
                 optimize_model(NSTEPS)
             if pasos % PASOS_UP_MODEL == 0:
                 updateModel()
-                dibujaGraficaQ("estados1")
+                dibujaGraficaQ("estadosPong")
                 if juegaPMedia:
                     juegaPartidas()
                     juegaPMedia = False
                 else: juegaPMedia = True
             
-            if done: break
+            if done or marcaPunto: break
 
 
 if __name__ == '__main__':
@@ -173,21 +186,16 @@ if __name__ == '__main__':
         BATCH_SIZE = 32
         PASOS_MAX_EPISODIO = 10000
         PASOS_UP_MODEL = 10000
-        RED = sys.argv[1]
-        NSTEPS = int(sys.argv[2])
+        NSTEPS = int(sys.argv[1])
 
-        env = make_atari("BreakoutNoFrameskip-v4")
+        env = make_atari("PongNoFrameskip-v4")
         # Warp the frames, grey scale, stake four frame and scale to smaller ratio
         env = wrap_deepmind(env, frame_stack=True, scale=True)
         env.seed(seed)
 
         #with tensorflow.device('/device:GPU:1'):
-        if RED == "Base":
-            red_politica = modelos.crear_modelo2(NUM_ACTIONS)
-            red_objetivo = modelos.crear_modelo2(NUM_ACTIONS)
-        elif RED == "Dueling":
-            red_politica = modelos.crear_modelo2_Dueling(NUM_ACTIONS)
-            red_objetivo = modelos.crear_modelo2_Dueling(NUM_ACTIONS)
+        red_politica = modelos.crear_modelo(NUM_ACTIONS)
+        red_objetivo = modelos.crear_modelo(NUM_ACTIONS)
             
         optimizer = keras.optimizers.Adam(learning_rate=0.00025, clipnorm=1.0)
         funcionPerdida = keras.losses.Huber()

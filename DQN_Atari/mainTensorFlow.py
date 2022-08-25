@@ -178,11 +178,11 @@ if __name__ == '__main__':
 
         #with tensorflow.device('/device:GPU:1'):
         if RED == "Base":
-            red_politica = modelos.crear_modelo2(NUM_ACTIONS)
-            red_objetivo = modelos.crear_modelo2(NUM_ACTIONS)
+            red_politica = modelos.crear_modelo(NUM_ACTIONS)
+            red_objetivo = modelos.crear_modelo(NUM_ACTIONS)
         elif RED == "Dueling":
-            red_politica = modelos.crear_modelo2_Dueling(NUM_ACTIONS)
-            red_objetivo = modelos.crear_modelo2_Dueling(NUM_ACTIONS)
+            red_politica = modelos.crear_modelo_Dueling(NUM_ACTIONS)
+            red_objetivo = modelos.crear_modelo_Dueling(NUM_ACTIONS)
             
         optimizer = keras.optimizers.Adam(learning_rate=0.00025, clipnorm=1.0)
         funcionPerdida = keras.losses.Huber()
